@@ -94,60 +94,63 @@ function Write-Theme
         $with
     )
 
-    $lastColor = $sl.Colors.PromptBackgroundColor
+    $lastColor = $ThemeSettings.Colors.PromptBackgroundColor
 
-    Write-Prompt -Object $sl.PromptSymbols.StartSymbol -ForegroundColor $sl.Colors.SessionInfoForegroundColor -BackgroundColor $sl.Colors.SessionInfoBackgroundColor
+    Write-Prompt -Object $ThemeSettings.PromptSymbols.StartSymbol -ForegroundColor $ThemeSettings.Colors.SessionInfoForegroundColor -BackgroundColor $ThemeSettings.Colors.SessionInfoBackgroundColor
 
     #check the last command state and indicate if failed
     If ($lastCommandFailed)
     {
-        Write-Prompt -Object "$($sl.PromptSymbols.FailedCommandSymbol) " -ForegroundColor $sl.Colors.CommandFailedIconForegroundColor -BackgroundColor $sl.Colors.SessionInfoBackgroundColor
+        Write-Prompt -Object "$($ThemeSettings.PromptSymbols.FailedCommandSymbol) " -ForegroundColor $ThemeSettings.Colors.CommandFailedIconForegroundColor -BackgroundColor $ThemeSettings.Colors.SessionInfoBackgroundColor
     }
 
     #check for elevated prompt
     If (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
-        Write-Prompt -Object "$($sl.PromptSymbols.ElevatedSymbol) " -ForegroundColor $sl.Colors.AdminIconForegroundColor -BackgroundColor $sl.Colors.SessionInfoBackgroundColor
+        Write-Prompt -Object "$($ThemeSettings.PromptSymbols.ElevatedSymbol) " -ForegroundColor $ThemeSettings.Colors.AdminIconForegroundColor -BackgroundColor $ThemeSettings.Colors.SessionInfoBackgroundColor
     }
 
     # Writes the time portion
     $time = ([DateTime]::Now.ToString("h:mm:ss") + " " + [char]::ConvertFromUtf32(0x1F553))
-    Write-Prompt -Object "$time " -ForegroundColor $sl.Colors.SessionInfoForegroundColor -BackgroundColor $sl.Colors.SessionInfoBackgroundColor
+    Write-Prompt -Object "$time " -ForegroundColor $ThemeSettings.Colors.SessionInfoForegroundColor -BackgroundColor $ThemeSettings.Colors.SessionInfoBackgroundColor
+    $lastColor = $ThemeSettings.Colors.SessionInfoBackgroundColor
 
     # Writes the history portion
-    $historyForeground = $sl.Colors.PromptForegroundColor
-    $historyBackground = [ConsoleColor]::Green
-    Write-Prompt -Object "$($sl.PromptSymbols.SegmentForwardSymbol) " -ForegroundColor $sl.Colors.SessionInfoBackgroundColor -BackgroundColor $historyBackground
-    Write-Prompt -Object "$(Get-HistoryId) " -ForegroundColor $historyForeground -BackgroundColor $historyBackground
-
-    Write-Prompt -Object "$($sl.PromptSymbols.SegmentForwardSymbol) " -ForegroundColor $historyBackground -BackgroundColor $sl.Colors.PromptBackgroundColor
+    Write-Prompt -Object $ThemeSettings.PromptSymbols.SegmentForwardSymbol -ForegroundColor "$lastColor" -BackgroundColor $ThemeSettings.Colors.HistoryBackgroundColor
+    Write-Prompt -Object " $(Get-HistoryId) " -ForegroundColor $ThemeSettings.colors.HistoryForegroundColor -BackgroundColor $ThemeSettings.Colors.HistoryBackgroundColor
+    $lastColor = $ThemeSettings.Colors.HistoryBackgroundColor
 
     # Writes the drive portion
-    Write-Prompt -Object (Get-FullPath -dir $pwd) -ForegroundColor $sl.Colors.PromptForegroundColor -BackgroundColor $sl.Colors.PromptBackgroundColor
-    Write-Prompt -Object ' ' -ForegroundColor $sl.Colors.PromptForegroundColor -BackgroundColor $sl.Colors.PromptBackgroundColor
+    Write-Prompt -Object $ThemeSettings.PromptSymbols.SegmentForwardSymbol -ForegroundColor "$lastColor" -BackgroundColor $ThemeSettings.Colors.DriveBackgroundColor
+    Write-Prompt -Object " $(Get-FullPath -dir $pwd) " -ForegroundColor $ThemeSettings.Colors.DriveForegroundColor -BackgroundColor $ThemeSettings.Colors.DriveBackgroundColor
+    $lastColor = $ThemeSettings.Colors.DriveBackgroundColor
 
     if ($with)
     {
-        Write-Prompt -Object $sl.PromptSymbols.SegmentForwardSymbol -ForegroundColor $lastColor -BackgroundColor $sl.Colors.WithBackgroundColor
-        Write-Prompt -Object " $($with.ToUpper()) " -BackgroundColor $sl.Colors.WithBackgroundColor -ForegroundColor $sl.Colors.WithForegroundColor
-        $lastColor = $sl.Colors.WithBackgroundColor
+        Write-Prompt -Object $ThemeSettings.PromptSymbols.SegmentForwardSymbol -ForegroundColor "$lastColor" -BackgroundColor $ThemeSettings.Colors.WithBackgroundColor
+        Write-Prompt -Object " $($with.ToUpper()) " -BackgroundColor $ThemeSettings.Colors.WithBackgroundColor -ForegroundColor $ThemeSettings.Colors.WithForegroundColor
+        $lastColor = $ThemeSettings.Colors.WithBackgroundColor
     }
 
-    Write-StatusAsync
+    Write-StatusAsync -LastColor $lastColor
 
     # Writes the postfix to the prompt
-    Write-Prompt -Object $sl.PromptSymbols.SegmentForwardSymbol -ForegroundColor $lastColor
+    Write-Prompt -Object $ThemeSettings.PromptSymbols.SegmentForwardSymbol -ForegroundColor "$lastColor" -BackgroundColor $ThemeSettings.Colors.PromptBackgroundColor #-ForegroundColor $lastColor
     Write-Host ''
-    Write-Prompt -Object $sl.PromptSymbols.PromptIndicator -ForegroundColor $sl.Colors.PromptSymbolColor
+    Write-Prompt -Object $ThemeSettings.PromptSymbols.PromptIndicator -ForegroundColor $ThemeSettings.Colors.PromptSymbolColor
 }
 
 $global:ThemeSettings.PromptSymbols.TruncatedFolderSymbol = '...'
 
-$sl = $global:ThemeSettings #local settings
-$sl.PromptSymbols.SegmentForwardSymbol = [char]::ConvertFromUtf32(0xE0B0)
-$sl.Colors.PromptForegroundColor = [ConsoleColor]::White
-$sl.Colors.PromptSymbolColor = [ConsoleColor]::White
-$sl.Colors.PromptHighlightColor = [ConsoleColor]::DarkBlue
-$sl.Colors.GitForegroundColor = [ConsoleColor]::Black
-$sl.Colors.WithForegroundColor = [ConsoleColor]::White
-$sl.Colors.WithBackgroundColor = [ConsoleColor]::DarkRed
+$ThemeSettings.PromptSymbols.SegmentForwardSymbol = [char]::ConvertFromUtf32(0xE0B0)
+$ThemeSettings.Colors.HistoryForegroundColor = [ConsoleColor]::White
+$ThemeSettings.Colors.HistoryBackgroundColor = [ConsoleColor]::Green
+$ThemeSettings.Colors.DriveForegroundColor = [ConsoleColor]::White
+$ThemeSettings.Colors.DriveBackgroundColor = [ConsoleColor]::DarkGray
+$ThemeSettings.Colors.PromptForegroundColor = [ConsoleColor]::White
+$ThemeSettings.Colors.PromptBackgroundColor = [ConsoleColor]::Black
+$ThemeSettings.Colors.PromptSymbolColor = [ConsoleColor]::White
+$ThemeSettings.Colors.PromptHighlightColor = [ConsoleColor]::DarkBlue
+$ThemeSettings.Colors.GitForegroundColor = [ConsoleColor]::Black
+$ThemeSettings.Colors.WithForegroundColor = [ConsoleColor]::White
+$ThemeSettings.Colors.WithBackgroundColor = [ConsoleColor]::DarkRed
