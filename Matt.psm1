@@ -12,6 +12,79 @@ function Get-HistoryId
     return $id
 }
 
+function Write-StatusAsync
+{
+    param
+    (
+        $LastColor
+    )
+
+    Set-StrictMode -Version 2
+    $ErrorActionPreference = "Stop"
+
+    $position = $Host.UI.RawUI.CursorPosition
+
+    # Runspaces need to be disposed, so keep track of them
+    if (-not (Test-Path Variable:GitStatusRunspaces))
+    {
+        $global:GitStatusRunspaces = [Collections.ArrayList]::new()
+    }
+    foreach ($gsr in $global:GitStatusRunspaces.ToArray())
+    {
+        if ($gsr.AsyncHandle.IsCompleted)
+        {
+            $gsr.Powershell.EndInvoke($gsr.AsyncHandle)
+            $gsr.Powershell.Dispose()
+            $gsr.Runspace.Dispose()
+            $global:GitStatusRunspaces.Remove($gsr)
+        }
+        # TODO: Should we cancel running jobs, since we're about to start a new one?
+    }
+
+    $runspace = [RunspaceFactory]::CreateRunspace($Host)
+    $powershell = [Powershell]::Create()
+    $powershell.Runspace = $runspace
+    $runspace.Open()
+    [void]$powershell.AddScript(
+    {
+        param
+        (
+            $WorkingDir,
+            $Position,
+            $ThemeSettings,
+            $LastColor
+        )
+
+        Set-StrictMode -Version 2
+        $ErrorActionPreference = "Stop"
+
+        Set-Location $WorkingDir
+
+        $status = Get-VCSStatus
+
+        if ($status)
+        {
+            $themeInfo = Get-VcsInfo -status ($status)
+
+            $buffer = $Host.UI.RawUI.NewBufferCellArray($ThemeSettings.PromptSymbols.SegmentForwardSymbol, $LastColor, $themeInfo.BackgroundColor)
+            $buffer += $Host.UI.RawUI.NewBufferCellArray(" $($themeInfo.VcInfo) ", $ThemeSettings.Colors.GitForegroundColor, $themeInfo.BackgroundColor)
+
+            $buffer += $Host.UI.RawUI.NewBufferCellArray($ThemeSettings.PromptSymbols.SegmentForwardSymbol, $themeInfo.BackgroundColor, $ThemeSettings.Colors.PromptBackgroundColor)
+
+            # Appending to buffer makes a flat object array; we need to turn it back into a 2-dimensional one
+            $bufferCells2d = [Management.Automation.Host.BufferCell[,]]::new(1, $buffer.Length)
+            for ($i = 0; $i -lt $buffer.Length; $i++)
+            {
+              $bufferCells2d[0,$i] = $buffer[$i] 
+            }
+
+            $host.UI.RawUI.SetBufferContents($Position, $bufferCells2d)
+        }
+    }).AddParameters(@{ Position = $position; ThemeSettings = $ThemeSettings; WorkingDir = (Get-Location); LastColor = $LastColor })
+
+    [void]$global:GitStatusRunspaces.Add((New-Object -TypeName PSObject -Property @{ Powershell = $powershell; AsyncHandle = $powershell.BeginInvoke(); Runspace = $runspace }))
+}
+
 function Write-Theme
 {
     param(
@@ -53,21 +126,14 @@ function Write-Theme
     Write-Prompt -Object (Get-FullPath -dir $pwd) -ForegroundColor $sl.Colors.PromptForegroundColor -BackgroundColor $sl.Colors.PromptBackgroundColor
     Write-Prompt -Object ' ' -ForegroundColor $sl.Colors.PromptForegroundColor -BackgroundColor $sl.Colors.PromptBackgroundColor
 
-    $status = Get-VCSStatus
-    if ($status)
-    {
-        $themeInfo = Get-VcsInfo -status ($status)
-        $lastColor = $themeInfo.BackgroundColor
-        Write-Prompt -Object $sl.PromptSymbols.SegmentForwardSymbol -ForegroundColor $sl.Colors.PromptBackgroundColor -BackgroundColor $lastColor
-        Write-Prompt -Object " $($themeInfo.VcInfo) " -BackgroundColor $lastColor -ForegroundColor $sl.Colors.GitForegroundColor        
-    }
-
     if ($with)
     {
         Write-Prompt -Object $sl.PromptSymbols.SegmentForwardSymbol -ForegroundColor $lastColor -BackgroundColor $sl.Colors.WithBackgroundColor
         Write-Prompt -Object " $($with.ToUpper()) " -BackgroundColor $sl.Colors.WithBackgroundColor -ForegroundColor $sl.Colors.WithForegroundColor
         $lastColor = $sl.Colors.WithBackgroundColor
     }
+
+    Write-StatusAsync
 
     # Writes the postfix to the prompt
     Write-Prompt -Object $sl.PromptSymbols.SegmentForwardSymbol -ForegroundColor $lastColor
